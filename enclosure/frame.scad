@@ -1,24 +1,24 @@
 // ====================================================================
-// DIY E-Ink Photo Frame (PicPak Style)
-// Parametric Enclosure for Waveshare 4.2" e-Paper Module + FireBeetle 2
+// DIY E-Ink Photo Frame (PicPak Style) - Full Feature Edition
+// Parametric Enclosure with Flush Kickstand + 4x Fridge Magnets
 // ====================================================================
 // Render modes:
-//   part = "all";   // Assembly view
-//   part = "front"; // Front bezel for 3D printing
-//   part = "back";  // Back cover for 3D printing
+//   part = "all";       // Exploded assembly view
+//   part = "front";     // Front bezel for 3D printing
+//   part = "back";      // Back cover with magnet pockets & kickstand slot
+//   part = "kickstand"; // Fold-out kickstand arm
 // ====================================================================
 
-part = "all"; // ["all", "front", "back"]
+part = "all"; // ["all", "front", "back", "kickstand"]
 
 $fn = 40;
 
 // Dimensions (mm)
 // Display active area: 84.8 x 63.6 mm
-// Display module PCB: ~103.0 x 78.5 x 1.2 mm
 screen_window_w = 86.0;   // Visible display opening
 screen_window_h = 65.0;
 
-screen_pocket_w = 104.0;  // Recess to seat the module
+screen_pocket_w = 104.0;  // Recess to seat the module PCB
 screen_pocket_h = 80.0;
 screen_pocket_d = 2.5;
 
@@ -28,13 +28,13 @@ frame_h = 106.0;
 frame_corner_r = 6.0;
 
 front_thickness = 4.0;
-back_thickness = 8.5;
+back_thickness = 9.0;
 wall = 2.0;
 
-// Internal electronics pocket
+// Internal electronics pocket (FireBeetle 2 + LiPo battery)
 cavity_w = 104.0;
 cavity_h = 96.0;
-cavity_depth = 6.5; // Accommodates FireBeetle 2 + LiPo battery pouch
+cavity_depth = 6.8;
 
 // Magnet recesses (10mm diameter x 2mm depth)
 mag_d = 10.2;
@@ -46,6 +46,12 @@ usbc_h = 6.5;
 
 // Tactile button cutout
 btn_hole_d = 4.0;
+
+// Kickstand Dimensions (stows completely flush with rear face)
+ks_w = 22.0;
+ks_len = 68.0;
+ks_thick = 2.2;
+pin_r = 1.4;
 
 // Helper: Rounded Rectangle
 module rounded_rect(w, h, d, r) {
@@ -65,7 +71,7 @@ module front_frame() {
         // Outer Body
         rounded_rect(frame_w, frame_h, front_thickness, frame_corner_r);
 
-        // Screen Window Cutout (Beveled slightly for clean look)
+        // Screen Window Cutout
         translate([(frame_w - screen_window_w)/2, frame_h - screen_window_h - 12.0, -0.1])
             cube([screen_window_w, screen_window_h, front_thickness + 0.2]);
 
@@ -73,11 +79,32 @@ module front_frame() {
         translate([(frame_w - screen_pocket_w)/2, frame_h - screen_pocket_h - 6.0, front_thickness - screen_pocket_d])
             cube([screen_pocket_w, screen_pocket_h, screen_pocket_d + 0.1]);
 
-        // Snap-fit rim / screw hole recesses (Corner alignment tabs)
+        // Corner snap alignment pin holes
         translate([6, 6, front_thickness - 2]) cylinder(r=1.5, h=2.1);
         translate([frame_w - 6, 6, front_thickness - 2]) cylinder(r=1.5, h=2.1);
         translate([6, frame_h - 6, front_thickness - 2]) cylinder(r=1.5, h=2.1);
         translate([frame_w - 6, frame_h - 6, front_thickness - 2]) cylinder(r=1.5, h=2.1);
+    }
+}
+
+// --------------------------------------------------------------------
+// KICKSTAND
+// --------------------------------------------------------------------
+module kickstand() {
+    difference() {
+        union() {
+            // Main leg
+            hull() {
+                translate([ks_w/2, ks_w/2, 0]) cylinder(d=ks_w, h=ks_thick);
+                translate([ks_w/2, ks_len - 6, 0]) cylinder(d=12, h=ks_thick);
+            }
+            // Pivot pins on top corners
+            translate([-1.8, ks_w/2, ks_thick/2])
+                rotate([0, 90, 0]) cylinder(r=pin_r, h=ks_w + 3.6);
+        }
+        // Finger grip notch for easy pull-out
+        translate([ks_w/2, ks_len - 10, -0.1])
+            cylinder(d=8, h=ks_thick + 0.2);
     }
 }
 
@@ -94,10 +121,22 @@ module back_cover() {
             rounded_rect(cavity_w, cavity_h, cavity_depth + 0.1, 3.0);
 
         // 4x Neodymium Magnet Pockets on rear surface
-        translate([15, 15, back_thickness - mag_depth]) cylinder(d=mag_d, h=mag_depth + 0.2);
-        translate([frame_w - 15, 15, back_thickness - mag_depth]) cylinder(d=mag_d, h=mag_depth + 0.2);
-        translate([15, frame_h - 15, back_thickness - mag_depth]) cylinder(d=mag_d, h=mag_depth + 0.2);
-        translate([frame_w - 15, frame_h - 15, back_thickness - mag_depth]) cylinder(d=mag_d, h=mag_depth + 0.2);
+        translate([12, 12, back_thickness - mag_depth]) cylinder(d=mag_d, h=mag_depth + 0.2);
+        translate([frame_w - 12, 12, back_thickness - mag_depth]) cylinder(d=mag_d, h=mag_depth + 0.2);
+        translate([12, frame_h - 12, back_thickness - mag_depth]) cylinder(d=mag_d, h=mag_depth + 0.2);
+        translate([frame_w - 12, frame_h - 12, back_thickness - mag_depth]) cylinder(d=mag_d, h=mag_depth + 0.2);
+
+        // Flush Recess for Stowed Kickstand
+        translate([(frame_w - ks_w - 1.0)/2, 18, back_thickness - ks_thick - 0.2])
+            hull() {
+                translate([(ks_w+1)/2, (ks_w+1)/2, 0]) cylinder(d=ks_w+1.2, h=ks_thick + 1.0);
+                translate([(ks_w+1)/2, ks_len - 4, 0]) cylinder(d=14, h=ks_thick + 1.0);
+            }
+
+        // Hinge Pin Sockets for Kickstand Pivot
+        translate([(frame_w - ks_w)/2 - 2.5, 18 + ks_w/2, back_thickness - ks_thick/2 - 0.2])
+            rotate([0, 90, 0])
+                cylinder(r=pin_r + 0.2, h=ks_w + 5.0);
 
         // USB-C Charging Port on Bottom Edge
         translate([(frame_w - usbc_w)/2, -1, 1.5])
@@ -121,10 +160,17 @@ module back_cover() {
 // --------------------------------------------------------------------
 if (part == "all") {
     color("GhostWhite") front_frame();
-    translate([0, 0, front_thickness + 12])
+    translate([0, 0, front_thickness + 12]) {
         color("#222222") back_cover();
+        // Stowed kickstand preview
+        translate([(frame_w - ks_w)/2, 18, back_thickness - ks_thick])
+            color("#c9882b") kickstand();
+    }
 } else if (part == "front") {
     front_frame();
 } else if (part == "back") {
     back_cover();
+} else if (part == "kickstand") {
+    kickstand();
 }
+

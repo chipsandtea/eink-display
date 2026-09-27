@@ -6,8 +6,8 @@ bool DisplayDriver::init() {
         _fspi = new SPIClass(VSPI);
         _fspi->begin(EINK_SCK, -1, EINK_MOSI, EINK_CS);
 
-        _display = new GxEPD2_4C<GxEPD2_420_GDEY042Z98, GxEPD2_420_GDEY042Z98::HEIGHT>(
-            GxEPD2_420_GDEY042Z98(EINK_CS, EINK_DC, EINK_RST, EINK_BUSY)
+        _display = new GxEPD2_4C<GxEPD2_420c_GDEY0420F51, GxEPD2_420c_GDEY0420F51::HEIGHT>(
+            GxEPD2_420c_GDEY0420F51(EINK_CS, EINK_DC, EINK_RST, EINK_BUSY)
         );
         _display->epd2.selectSPI(*_fspi, SPISettings(4000000, MSBFIRST, SPI_MODE0));
     }

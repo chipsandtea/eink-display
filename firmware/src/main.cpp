@@ -2,13 +2,13 @@
 #include "config.h"
 #include "power.h"
 #include "display_driver.h"
-#include "sd_manager.h"
+#include "storage_manager.h"
 #include "web_server.h"
 
 PowerManager pwr;
 DisplayDriver disp;
-SDManager sd;
-WebServerManager webServer(sd, disp, pwr);
+StorageManager storage;
+WebServerManager webServer(storage, disp, pwr);
 
 void runUploadMode() {
     disp.showUploadModeScreen(AP_SSID, AP_IP);
@@ -23,17 +23,17 @@ void runUploadMode() {
 }
 
 void displayNextPhoto() {
-    int id = sd.getNextPhotoId();
+    int id = storage.getNextPhotoId();
     if (id >= 0) {
         uint8_t* buffer = (uint8_t*)malloc(IMAGE_SIZE);
         if (buffer) {
-            if (sd.loadPhoto(id, buffer, IMAGE_SIZE)) {
+            if (storage.loadPhoto(id, buffer, IMAGE_SIZE)) {
                 disp.showImage(buffer, IMAGE_SIZE);
             }
             free(buffer);
         }
     } else {
-        disp.showStatusMessage("No Photos");
+        disp.showStatusMessage("No Photos Yet\nPress Button to Upload");
     }
 }
 
@@ -43,41 +43,35 @@ void setup() {
     
     int batPct = pwr.batteryPercent();
     if (batPct < 10 && !pwr.isFirstBoot()) {
-        pwr.enableDisplayPower();
         disp.init();
         disp.showBatteryWarning();
         disp.powerOff();
-        pwr.disableDisplayPower();
-        // Deep sleep indefinitely, waiting for charge/button
+        // Deep sleep indefinitely until button wake / recharge
         pwr.enterDeepSleep(0);
         return;
     }
 
     if (pwr.isButtonWake() || pwr.isFirstBoot()) {
-        pwr.enableDisplayPower();
         disp.init();
-        if (!sd.init()) {
-            disp.showStatusMessage("SD Init Failed");
+        if (!storage.init()) {
+            disp.showStatusMessage("Storage Mount Failed");
         } else {
             runUploadMode();
             displayNextPhoto();
         }
         disp.powerOff();
-        pwr.disableDisplayPower();
         
     } else if (pwr.isTimerWake()) {
-        pwr.enableDisplayPower();
         disp.init();
-        if (sd.init()) {
+        if (storage.init()) {
             displayNextPhoto();
         }
         disp.powerOff();
-        pwr.disableDisplayPower();
     }
 
     // Get next wake time from config
     JsonDocument doc;
-    sd.loadSettings(doc);
+    storage.loadSettings(doc);
     uint32_t hours = doc["refreshHours"] | DEFAULT_REFRESH_HOURS;
     if (hours == 0) hours = DEFAULT_REFRESH_HOURS;
     
@@ -85,5 +79,5 @@ void setup() {
 }
 
 void loop() {
-    // Everything handled in setup() or deep sleep
+    // Everything handled in setup() and deep sleep
 }

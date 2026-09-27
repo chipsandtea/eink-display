@@ -3,21 +3,22 @@
 #include <LittleFS.h>
 #include <ESPmDNS.h>
 
-WebServerManager::WebServerManager(SDManager& sd, DisplayDriver& disp, PowerManager& pwr) 
-    : _sd(sd), _disp(disp), _pwr(pwr) {
+WebServerManager::WebServerManager(StorageManager& storage, DisplayDriver& disp, PowerManager& pwr) 
+    : _storage(storage), _disp(disp), _pwr(pwr) {
     _server = new AsyncWebServer(80);
     _dns = new DNSServer();
 }
 
 void WebServerManager::start() {
     if (!LittleFS.begin(true)) {
-        Serial.println("LittleFS Mount Failed");
+        Serial.println("[WebServer] LittleFS Mount Failed");
     }
 
     WiFi.mode(WIFI_AP);
     WiFi.softAP(AP_SSID, AP_PASS);
     IPAddress IP = WiFi.softAPIP();
     
+    // Captive portal: redirect all DNS requests to frame's IP
     _dns->start(53, "*", IP);
     MDNS.begin("einkframe");
     
@@ -25,11 +26,12 @@ void WebServerManager::start() {
     
     _server->begin();
     resetTimeout();
+    Serial.printf("[WebServer] AP started. IP: %s\n", IP.toString().c_str());
 }
 
 void WebServerManager::stop() {
-    _server->end();
-    _dns->stop();
+    if (_server) _server->end();
+    if (_dns) _dns->stop();
     WiFi.softAPdisconnect(true);
     MDNS.end();
 }
@@ -45,10 +47,11 @@ void WebServerManager::resetTimeout() {
 }
 
 void WebServerManager::loop() {
-    _dns->processNextRequest();
+    if (_dns) _dns->processNextRequest();
 }
 
 void WebServerManager::setupRoutes() {
+    // Serve HTML
     _server->on("/", HTTP_GET, [this](AsyncWebServerRequest *request) {
         resetTimeout();
         if (LittleFS.exists("/index.html.gz")) {
@@ -60,14 +63,17 @@ void WebServerManager::setupRoutes() {
         }
     });
 
+    // Serve CSS
     _server->on("/style.css", HTTP_GET, [this](AsyncWebServerRequest *request) {
         request->send(LittleFS, "/style.css", "text/css");
     });
     
+    // Serve JS
     _server->on("/app.js", HTTP_GET, [this](AsyncWebServerRequest *request) {
         request->send(LittleFS, "/app.js", "application/javascript");
     });
 
+    // Upload raw 30KB processed binary image
     _server->on("/api/upload", HTTP_POST, 
         [this](AsyncWebServerRequest *request){
             request->send(200, "application/json", "{\"status\":\"ok\"}");
@@ -83,9 +89,8 @@ void WebServerManager::setupRoutes() {
                 memcpy(buffer + index, data, len);
             }
             if (index + len == total) {
-                if (total == IMAGE_SIZE) {
-                    int id = _sd.savePhoto(buffer, total);
-                    // could send better response here if handling allows
+                if (total == IMAGE_SIZE && buffer) {
+                    _storage.savePhoto(buffer, total);
                 }
                 if (buffer) {
                     free(buffer);
@@ -94,31 +99,34 @@ void WebServerManager::setupRoutes() {
             }
         });
 
+    // List all photos
     _server->on("/api/photos", HTTP_GET, [this](AsyncWebServerRequest *request) {
         resetTimeout();
         JsonDocument doc;
         JsonArray arr = doc["photos"].to<JsonArray>();
-        _sd.getPhotoList(arr);
+        _storage.getPhotoList(arr);
         String response;
         serializeJson(doc, response);
         request->send(200, "application/json", response);
     });
 
+    // Delete photo by ID
     _server->on("^\\/api\\/photos\\/([0-9]+)$", HTTP_DELETE, [this](AsyncWebServerRequest *request) {
         resetTimeout();
         String idStr = request->pathArg(0);
-        if (_sd.deletePhoto(idStr.toInt())) {
+        if (_storage.deletePhoto(idStr.toInt())) {
             request->send(200);
         } else {
             request->send(404);
         }
     });
 
+    // Display photo immediately on e-ink screen
     _server->on("^\\/api\\/display\\/([0-9]+)$", HTTP_POST, [this](AsyncWebServerRequest *request) {
         resetTimeout();
         String idStr = request->pathArg(0);
         uint8_t* buffer = (uint8_t*)malloc(IMAGE_SIZE);
-        if (buffer && _sd.loadPhoto(idStr.toInt(), buffer, IMAGE_SIZE)) {
+        if (buffer && _storage.loadPhoto(idStr.toInt(), buffer, IMAGE_SIZE)) {
             _disp.showImage(buffer, IMAGE_SIZE);
             request->send(200);
         } else {
@@ -127,24 +135,25 @@ void WebServerManager::setupRoutes() {
         if (buffer) free(buffer);
     });
 
+    // Status endpoint (battery %, photo count, refresh interval)
     _server->on("/api/status", HTTP_GET, [this](AsyncWebServerRequest *request) {
         resetTimeout();
         JsonDocument doc;
         doc["battery"] = _pwr.batteryPercent();
-        doc["photoCount"] = _sd.getPhotoCount();
+        doc["photoCount"] = _storage.getPhotoCount();
         doc["maxPhotos"] = MAX_PHOTOS;
         
         JsonDocument settings;
-        _sd.loadSettings(settings);
-        doc["refreshHours"] = settings["refreshHours"];
-        doc["cycleMode"] = settings["cycleMode"];
+        _storage.loadSettings(settings);
+        doc["refreshHours"] = settings["refreshHours"] | DEFAULT_REFRESH_HOURS;
+        doc["cycleMode"] = settings["cycleMode"] | "sequential";
         
         String response;
         serializeJson(doc, response);
         request->send(200, "application/json", response);
     });
 
-    // Handle Settings (Body parsing via callback)
+    // Update settings
     _server->on("/api/settings", HTTP_POST, 
         [this](AsyncWebServerRequest *request){ /* Handled in body */ },
         nullptr,
@@ -154,7 +163,7 @@ void WebServerManager::setupRoutes() {
                 JsonDocument doc;
                 DeserializationError err = deserializeJson(doc, data, len);
                 if (!err) {
-                    _sd.saveSettings(doc);
+                    _storage.saveSettings(doc);
                     request->send(200);
                 } else {
                     request->send(400);
@@ -162,11 +171,13 @@ void WebServerManager::setupRoutes() {
             }
         });
 
+    // Exit upload mode command
     _server->on("/api/exit", HTTP_POST, [this](AsyncWebServerRequest *request) {
         _exitFlag = true;
         request->send(200);
     });
 
+    // Captive portal fallback redirect
     _server->onNotFound([this](AsyncWebServerRequest *request) {
         request->redirect("/");
     });

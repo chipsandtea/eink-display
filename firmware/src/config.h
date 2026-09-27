@@ -28,7 +28,7 @@
 // ==========================================
 // Storage & Image Specifications
 // ==========================================
-#define MAX_PHOTOS            400     // 400 * 30KB = 12MB in LittleFS
+#define MAX_PHOTOS            500     // Matches PicPak (500+ capacity)
 #define DEFAULT_REFRESH_HOURS 4       // Refresh interval in hours
 #define UPLOAD_TIMEOUT_MS     300000  // 5 minutes of idle before entering display sleep
 #define IMAGE_SIZE            30000   // 400 * 300 * 2 bits / 8 bits = 30,000 bytes

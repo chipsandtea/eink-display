@@ -2,8 +2,8 @@
 
 #include <Arduino.h>
 #include <SPI.h>
-#include <GxEPD2_BW.h>
 #include <GxEPD2_4C.h>
+#include <epd4c/GxEPD2_420c_GDEY0420F51.h>
 #include <Fonts/FreeSansBold12pt7b.h>
 #include "qrcode.h"
 
@@ -17,5 +17,5 @@ public:
     void powerOff();
 private:
     SPIClass* _fspi = nullptr;
-    GxEPD2_4C<GxEPD2_420_GDEY042Z98, GxEPD2_420_GDEY042Z98::HEIGHT>* _display = nullptr;
+    GxEPD2_4C<GxEPD2_420c_GDEY0420F51, GxEPD2_420c_GDEY0420F51::HEIGHT>* _display = nullptr;
 };
