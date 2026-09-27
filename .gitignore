@@ -3,3 +3,6 @@ __pycache__/
 venv/
 output/*.png
 output/*.jpg
+
+# Separate project: Android NFC App Blocker
+NfcAppBlocker/
