@@ -25,7 +25,7 @@ bool StorageManager::init() {
     return true;
 }
 
-String StorageManager::getPhotoFilename(int id) {
+String StorageManager::getPhotoPath(int id) {
     char buf[32];
     snprintf(buf, sizeof(buf), "%s/%04d.bin", PHOTOS_DIR, id);
     return String(buf);
@@ -45,13 +45,13 @@ int StorageManager::savePhoto(const uint8_t* data, size_t len) {
     // Find next available ID (1..MAX_PHOTOS)
     int nextId = 1;
     for (int i = 1; i <= MAX_PHOTOS + 1; i++) {
-        if (!LittleFS.exists(getPhotoFilename(i))) {
+        if (!LittleFS.exists(getPhotoPath(i))) {
             nextId = i;
             break;
         }
     }
 
-    String path = getPhotoFilename(nextId);
+    String path = getPhotoPath(nextId);
     File f = LittleFS.open(path, "w");
     if (!f) {
         Serial.printf("[Storage] Failed to open %s for write\n", path.c_str());
@@ -73,7 +73,7 @@ int StorageManager::savePhoto(const uint8_t* data, size_t len) {
 
 bool StorageManager::loadPhoto(int id, uint8_t* buffer, size_t bufLen) {
     if (bufLen < IMAGE_SIZE) return false;
-    String path = getPhotoFilename(id);
+    String path = getPhotoPath(id);
     if (!LittleFS.exists(path)) return false;
 
     File f = LittleFS.open(path, "r");
@@ -85,7 +85,7 @@ bool StorageManager::loadPhoto(int id, uint8_t* buffer, size_t bufLen) {
 }
 
 bool StorageManager::deletePhoto(int id) {
-    String path = getPhotoFilename(id);
+    String path = getPhotoPath(id);
     if (LittleFS.exists(path)) {
         return LittleFS.remove(path);
     }
@@ -117,7 +117,6 @@ bool StorageManager::getPhotoList(JsonArray& arr) {
         if (!file.isDirectory()) {
             String name = String(file.name());
             if (name.endsWith(".bin")) {
-                // Filename can be "0001.bin" or "/p/0001.bin"
                 int lastSlash = name.lastIndexOf('/');
                 String base = (lastSlash >= 0) ? name.substring(lastSlash + 1) : name;
                 int id = base.substring(0, base.length() - 4).toInt();
@@ -135,10 +134,6 @@ bool StorageManager::getPhotoList(JsonArray& arr) {
 }
 
 int StorageManager::getNextPhotoId() {
-    int count = getPhotoCount();
-    if (count == 0) return -1;
-
-    // Collect all existing IDs into a list
     int ids[MAX_PHOTOS];
     int idx = 0;
     
@@ -161,6 +156,17 @@ int StorageManager::getNextPhotoId() {
     }
 
     if (idx == 0) return -1;
+
+    // Sort IDs ascending so sequential order is deterministic
+    for (int i = 0; i < idx - 1; i++) {
+        for (int j = i + 1; j < idx; j++) {
+            if (ids[j] < ids[i]) {
+                int tmp = ids[i];
+                ids[i] = ids[j];
+                ids[j] = tmp;
+            }
+        }
+    }
 
     JsonDocument doc;
     loadSettings(doc);

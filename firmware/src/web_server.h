@@ -21,7 +21,10 @@ private:
     DisplayDriver& _disp;
     PowerManager& _pwr;
     bool _exitFlag = false;
+    int _pendingDisplayId = -1;
     uint32_t _lastActivity = 0;
+    uint8_t* _uploadBuffer = nullptr;
+    bool _uploadSuccess = false;
     
     AsyncWebServer* _server = nullptr;
     DNSServer* _dns = nullptr;

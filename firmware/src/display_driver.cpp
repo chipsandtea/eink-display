@@ -3,7 +3,7 @@
 
 bool DisplayDriver::init() {
     if (!_display) {
-        _fspi = new SPIClass(VSPI);
+        _fspi = new SPIClass(FSPI);
         _fspi->begin(EINK_SCK, -1, EINK_MOSI, EINK_CS);
 
         _display = new GxEPD2_4C<GxEPD2_420c_GDEY0420F51, GxEPD2_420c_GDEY0420F51::HEIGHT>(
@@ -98,7 +98,7 @@ void DisplayDriver::showStatusMessage(const char* msg) {
     _display->firstPage();
     do {
         _display->fillScreen(GxEPD_WHITE);
-        _display->setCursor(40, 150);
+        _display->setCursor(20, 140);
         _display->print(msg);
     } while (_display->nextPage());
 }

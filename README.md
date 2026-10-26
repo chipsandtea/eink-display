@@ -1,68 +1,56 @@
-# DIY E-Ink Photo Album
+# DIY E-Ink Photo Frame (PicPak Style)
 
-This project is a small homebrew prototype inspired by the feel of Picpak-style e-ink photo albums: slow, calm, battery-friendly, and built around a few cherished photos rather than a flashy color screen.
+A battery-powered, self-contained e-ink photo frame built around the **Seeed Studio XIAO ESP32S3** and a **Waveshare 4.2" 4-Color (B/W/Y/R) e-Paper Module (G)**.
 
-The goal here is not a production product; it is a practical starting point you can run on a Raspberry Pi or a desktop during development.
+The XIAO ESP32S3 **is** the server—no Raspberry Pi, no cloud, and no external SD card module required. Connect to its WiFi hotspot from your phone, pick photos in your browser, and the browser automatically crops, sharpens, dithers to the 4-color e-ink palette, and uploads a compact 30KB binary directly to the XIAO's onboard LittleFS flash (~180 photo capacity).
 
-## What this prototype does
+## Key Features
 
-- Builds an e-ink-style album page from a set of local photos
-- Applies a grayscale, paper-like aesthetic to mimic e-paper
-- Supports a simple slideshow / refresh flow for a home display
-- Gives you a foundation for a Raspberry Pi + e-ink device at home
+- **Zero External Storage or Charger Needed**: Uses the XIAO ESP32S3's built-in 8MB Flash (~6MB LittleFS partition storing up to 180 photos) and built-in USB-C LiPo charging circuit.
+- **Browser-Side Image Pipeline**: Client-side JavaScript (`firmware/data/app.js`) handles EXIF orientation, 4:3 center-cropping, 400×300 scaling, contrast/unsharp mask, Floyd-Steinberg 4-color dithering, and 2-bits-per-pixel packing.
+- **Live Gallery Thumbnails**: The web UI renders real dithered 4-color previews of all stored photos directly from their 30KB binaries.
+- **Ultra-Low Power Sleep**: Wakes on an RTC timer (1h–24h), updates the e-ink screen, hibernates the panel, and returns to deep sleep (~14µA on XIAO ESP32S3). Pressing the physical button wakes the frame immediately into Upload Mode with an on-screen WiFi QR code.
+- **3D-Printable Enclosure**: Parametric OpenSCAD enclosure (`enclosure/frame.scad`) with a flush fold-out kickstand and 4x fridge magnet recesses.
 
-## Recommended hardware
+## Wiring (Seeed Studio XIAO ESP32S3)
 
-For a real device, the simplest DIY stack is:
+| Waveshare 4.2" (G) Pin | XIAO ESP32S3 Pin | GPIO | Wire Color (Typical) |
+|------------------------|------------------|------|----------------------|
+| **VCC**                | **3V3**          | —    | Red                  |
+| **GND**                | **GND**          | —    | Black                |
+| **DIN** (MOSI)         | **D10**          | `9`  | Blue                 |
+| **CLK** (SCK)          | **D8**           | `7`  | Yellow               |
+| **CS**                 | **D1**           | `2`  | Orange               |
+| **DC**                 | **D2**           | `3`  | Green                |
+| **RST**                | **D3**           | `4`  | White                |
+| **BUSY**               | **D4**           | `5`  | Purple               |
 
-- Raspberry Pi Zero 2 W or Pi 4
-- 7.5-inch or 13.3-inch e-ink panel
-- MicroSD card with Raspberry Pi OS
-- USB power bank or battery with power management
-- Small wall mount or stand
-- Optional Wi-Fi sync from a phone or laptop
+**Peripherals:**
+- **Upload Wake Button**: Momentary button between **D5 (`GPIO 6`)** and **GND** (uses internal RTC pull-up; no external resistor needed).
+- **LiPo Battery**: 3.7V LiPo soldered to the **BAT+ / BAT-** pads on the bottom of the XIAO ESP32S3.
+- **Battery Voltage Sense (Optional)**: Two equal resistors (e.g., 2× 220kΩ) forming a 2:1 divider from **BAT+** to **D0 (`GPIO 1`)** and **GND**. (If omitted, firmware safely defaults to reporting 100%).
 
-A good target build is:
-
-- Display: 7.5" monochrome e-paper
-- Controller: Raspberry Pi Zero 2 W
-- Storage: local USB stick with a photo library
-- Update cadence: one page every 10-30 minutes or a manual button-triggered refresh
-
-## Software layout
-
-- `src/album_generator.py` generates a static album page with a paper-like e-ink look
-- `output/` contains generated album previews
-
-## Quick start
-
-1. Install Python dependencies
-2. Run the generator
-3. Review the generated album image
+## Flashing Firmware & Web App (PlatformIO)
 
 ```bash
-pip install -r requirements.txt
-python src/album_generator.py --out output/album_preview.png --title "Home Memories"
+cd firmware
+
+# 1. Build and upload the LittleFS web app (index.html, style.css, app.js)
+pio run --target uploadfs
+
+# 2. Build and upload the ESP32-S3 firmware
+pio run --target upload
 ```
 
-## Design notes
+## Project Structure
 
-This concept intentionally avoids trying to recreate a full color, high-refresh digital photo frame. The charm of the e-ink photo album is the slow interaction:
-
-- fewer photos per page
-- matte paper background
-- reduced power draw
-- grayscale tone with soft contrast
-- a more contemplative, framed experience
-
-## Next upgrades
-
-- Add a slideshow loop for multiple pages
-- Add automatic refresh on a timer
-- Build a small local web UI to select albums and rotate photos
-- Add a power-saving sleep mode for the Pi
-- Use a driver library for a specific e-ink panel model
-
-## Notes
-
-This is intentionally a modest prototype. It is designed to be easy to adjust, easy to run locally, and easy to expand into a real home display project.
+- [`firmware/`](file:///d:/antigravity/eink-display/firmware/platformio.ini) — PlatformIO C++ firmware for Seeed Studio XIAO ESP32S3
+  - [`src/config.h`](file:///d:/antigravity/eink-display/firmware/src/config.h) — XIAO ESP32S3 pin definitions and constants
+  - [`src/main.cpp`](file:///d:/antigravity/eink-display/firmware/src/main.cpp) — Boot wake state machine (Display Mode vs. Upload Mode)
+  - [`src/display_driver.cpp`](file:///d:/antigravity/eink-display/firmware/src/display_driver.cpp) — GxEPD2 4-color driver & WiFi QR code screen
+  - [`src/storage_manager.cpp`](file:///d:/antigravity/eink-display/firmware/src/storage_manager.cpp) — LittleFS `/p/NNNN.bin` photo storage & `/config.json` settings
+  - [`src/web_server.cpp`](file:///d:/antigravity/eink-display/firmware/src/web_server.cpp) — Captive portal AP, REST API, and LittleFS static server
+  - [`src/power.cpp`](file:///d:/antigravity/eink-display/firmware/src/power.cpp) — Deep sleep, RTC button wakeup, and calibrated ADC battery reading
+  - [`data/`](file:///d:/antigravity/eink-display/firmware/data/index.html) — Self-contained web app (`index.html`, `style.css`, `app.js`)
+- [`enclosure/frame.scad`](file:///d:/antigravity/eink-display/enclosure/frame.scad) — Parametric 3D-printable Polaroid-style frame with kickstand & magnet mounts
+- [`IMPLEMENTATION_PLAN.md`](file:///d:/antigravity/eink-display/IMPLEMENTATION_PLAN.md) — Full hardware BOM, architecture diagrams, and verification plan

@@ -13,10 +13,10 @@ public:
     int getNextPhotoId();
     int getPhotoCount();
     bool getPhotoList(JsonArray& arr);
+    String getPhotoPath(int id);
     void loadSettings(JsonDocument& doc);
     void saveSettings(const JsonDocument& doc);
 
 private:
-    String getPhotoFilename(int id);
     int _currentPhotoIndex = 0;
 };

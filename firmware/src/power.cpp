@@ -1,26 +1,32 @@
 #include "power.h"
 #include "config.h"
+#include <driver/rtc_io.h>
 
 void PowerManager::init() {
+    rtc_gpio_deinit((gpio_num_t)UPLOAD_BUTTON);
     pinMode(UPLOAD_BUTTON, INPUT_PULLUP);
+    pinMode(BATTERY_ADC, INPUT);
     analogReadResolution(12); // 12-bit ADC (0..4095)
 }
 
 float PowerManager::readBatteryVoltage() {
-    long sum = 0;
-    for (int i = 0; i < 10; i++) {
-        sum += analogRead(BATTERY_ADC);
-        delay(5);
+    // Use calibrated millivolts reading on ESP32-S3
+    uint32_t sumMv = 0;
+    for (int i = 0; i < 8; i++) {
+        sumMv += analogReadMilliVolts(BATTERY_ADC);
+        delay(2);
     }
-    float avgAdc = sum / 10.0f;
-    // FireBeetle 2 onboard divider: 2:1 (reads half the battery voltage)
-    // 3.3V reference / 4095 * 2.0 = approx voltage
-    float voltage = (avgAdc / 4095.0f) * 3.3f * 2.0f;
+    float avgMv = sumMv / 8.0f;
+    // Assumes 2:1 resistor divider from BAT+ to BATTERY_ADC (D0)
+    float voltage = (avgMv / 1000.0f) * 2.0f;
     return voltage;
 }
 
 int PowerManager::batteryPercent() {
     float v = readBatteryVoltage();
+    // If no battery voltage divider is wired (floating/0V near GND) or running on USB only without divider,
+    // return 100% rather than triggering a false low-battery lockout.
+    if (v < 2.0f) return 100;
     if (v >= 4.20f) return 100;
     if (v >= 3.85f) return 75 + (int)((v - 3.85f) / 0.35f * 25.0f);
     if (v >= 3.70f) return 50 + (int)((v - 3.70f) / 0.15f * 25.0f);
@@ -46,7 +52,9 @@ void PowerManager::enterDeepSleep(uint32_t hours) {
         esp_sleep_enable_timer_wakeup(sleepTimeUs);
     }
     
-    // Enable external wakeup via button press (LOW)
+    // Maintain internal pull-up in RTC domain so button works without an external resistor
+    rtc_gpio_pullup_en((gpio_num_t)UPLOAD_BUTTON);
+    rtc_gpio_pulldown_dis((gpio_num_t)UPLOAD_BUTTON);
     esp_sleep_enable_ext0_wakeup((gpio_num_t)UPLOAD_BUTTON, 0);
     
     Serial.printf("[Power] Entering deep sleep for %u hour(s)...\n", hours);
