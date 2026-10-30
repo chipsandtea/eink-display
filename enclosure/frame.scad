@@ -66,17 +66,22 @@ xiao_l = 21.4;       // Length with clearance
 mag_d     = 12.35;   // 12mm + 0.35mm FDM press/glue clearance
 mag_depth = 3.20;    // 3mm + 0.20mm flush recess margin
 
+// Button Placement & 6x6 Tactile Switch Housing
+// Ergonomically located on the RIGHT wall at Y = 48.0mm (natural thumb/finger resting
+// height, centered between magnets, well above desk surface when standing on kickstand)
+btn_y      = 48.0;   // Height along frame_h (85.0 mm total height)
+
 // Wide U-Ring Easel Kickstand (Surface / Switch OLED style)
 ks_w       = 64.0;   // Wide 64mm stance so frame never wobbles
-ks_h       = 42.0;   // Height of U-frame
-ks_leg_w   = 8.5;    // Width of side legs and bottom bar
-ks_thick   = 3.2;    // Rigid 3.2mm thickness
+ks_h       = 44.0;   // Height of U-frame
+ks_leg_w   = 9.0;    // Width of side legs and bottom bar
+ks_thick   = 3.0;    // Rigid 3.0mm thickness
 ks_corner  = 4.5;    // Outer corner radius
 ks_x       = (frame_w - ks_w) / 2;
 ks_y       = 8.0;    // Distance from bottom edge (Y = 0)
-ks_hinge_y = ks_y + ks_h - 5.0; // Pivot axis near top of side legs
-ks_pin_d   = 3.6;    // Beefy 3.6mm diameter pivot pins
-ks_pin_len = 2.2;    // Pin extension per side
+ks_hinge_y = ks_y + ks_h - 3.6; // Pivot axis 3.6mm from top of legs (3.6mm radial knuckle!)
+ks_pin_d   = 3.0;    // 3.0mm diameter pivot pins (matches ks_thick)
+ks_pin_len = 2.0;    // Pin extension per side
 
 // --------------------------------------------------------------------
 // 2. Reusable Geometric Primitives
@@ -148,6 +153,12 @@ module front_frame() {
                 translate([x_off, frame_h - lip_inset - lip_tol, front_h + lip_h * 0.55])
                     rotate([0, 90, 0]) cylinder(r=0.45, h=10, center=true);
             }
+
+            // Button Cap & Switch Hold-Down Tab (on right wall of assembled frame):
+            // When front_frame mates with back_cover, this tab locks down into the top
+            // of the button guide track and switch cradle, capturing both parts securely!
+            translate([wall + lip_tol, btn_y - 4.5, front_h - 0.01])
+                cube([2.4, 9.0, lip_h + 1.2]);
         }
 
         // 45-degree Gallery Mat Bevel Window
@@ -214,14 +225,16 @@ module back_cover_geom() {
         ks_tol = 0.45;
         difference() {
             union() {
-                // Main U-frame recess (depth = ks_thick + 0.25mm)
+                // Main U-frame recess (depth = ks_thick + 0.25mm = 3.25mm)
                 translate([ks_x - ks_tol, ks_y - ks_tol, -0.1])
                     rounded_box(ks_w + ks_tol * 2, ks_h + ks_tol * 2, ks_thick + 0.35, ks_corner + ks_tol);
 
-                // Clearance bevel above top of side legs so they can pivot to 60-deg hard stop
+                // Cylindrical + angled hard-stop pocket around the hinge axis (depth = 3.65mm):
+                // Gives full radial clearance for the 3.6mm knuckle to swing open to ~58 degrees
+                // before the flat inner stop face of the leg hits the pocket floor!
                 for (side_x = [ks_x - ks_tol, ks_x + ks_w - ks_leg_w - ks_tol]) {
-                    translate([side_x, ks_hinge_y - 2, -0.1])
-                        cube([ks_leg_w + ks_tol * 2, 8.5, ks_thick + 1.1]);
+                    translate([side_x, ks_hinge_y - 1.5, -0.1])
+                        rounded_box(ks_leg_w + ks_tol * 2, (ks_y + ks_h - ks_hinge_y) + 2.5, 3.75, 2.0);
                 }
             }
 
@@ -236,7 +249,7 @@ module back_cover_geom() {
         for (px = [ks_x - ks_pin_len, ks_x + ks_w - 0.2]) {
             translate([px, ks_hinge_y, ks_thick / 2])
                 rotate([0, 90, 0])
-                    cylinder(d=ks_pin_d + 0.4, h=ks_pin_len + 0.4);
+                    cylinder(d=ks_pin_d + 0.45, h=ks_pin_len + 0.4);
         }
 
         // Closed-Position Retention Detent Recesses near bottom of kickstand pocket
@@ -270,9 +283,15 @@ module back_cover_geom() {
         translate([(frame_w - 10.2) / 2, -0.5, floor_t + 1.0])
             rounded_box(10.2, 5.0, 4.8, 1.4);
 
-        // Side Action Button Slot on Right Wall (Y = 22mm)
-        translate([frame_w - 4.0, 18.0, floor_t + 1.0])
-            cube([6.0, 8.2, 4.2]);
+        // Open-Top Side Action Button Slot + Interior Flange Guide Track on Right Wall (Y = btn_y = 48mm)
+        // Open all the way to the top rim (Z = back_h) so the button cap simply drops straight down
+        // from the top before the front bezel snaps on and locks it in!
+        // 1. Exterior pill slot through the right wall (width Y = 8.6mm, from Z = floor_t + 0.8 to top)
+        translate([frame_w - 4.0, btn_y - 4.3, floor_t + 0.8])
+            cube([6.0, 8.6, back_h]);
+        // 2. Interior vertical guide channel for the button cap's retention flange (width Y = 11.6mm, depth X = 2.6mm)
+        translate([frame_w - 2.4 - 2.6, btn_y - 5.8, floor_t])
+            cube([2.6, 11.6, back_h]);
     }
 
     // ---- Internal Component Cradles (sitting on floor_t inside cavity) ----
@@ -289,14 +308,39 @@ module back_cover_geom() {
             cube([10, xiao_l + 2, 1.2]);
     }
 
-    // 2. Tactile 6x6mm Switch Holder behind the Right-Wall Button Slot (Y = 22.0)
-    btn_y = 22.0;
-    translate([frame_w - 3.2 - 6.5, btn_y - 5.0, floor_t]) {
+    // 2. Tactile 6x6mm Switch Holder behind the Drop-In Button Track (Y = btn_y = 48mm)
+    // Engineered specifically for standard 6x6x5mm or 6x6x6mm tactile switches.
+    // - Body sits on 4 solid corner ledges at Z = 1.4mm
+    // - Generous 10.4mm wide relief channel + 2.6mm deep well below ledges ensures
+    //   flared metal prongs and soldered wires NEVER bind or bottom out!
+    // - Open-top design: switch drops straight in from above during assembly.
+    sw_w = 8.2;
+    sw_len = 13.0;
+    sw_x = frame_w - 2.4 - 2.6 - sw_w; // = frame_w - 13.2mm
+    translate([sw_x, btn_y - sw_len / 2, floor_t]) {
         difference() {
-            cube([6.5, 10.0, 4.8]);
-            translate([0.8, 1.8, 0]) cube([6.2, 6.4, 5.5]);
-            translate([3.5, 3.0, 0.8]) cube([4.0, 4.0, 4.5]);
-            translate([-0.5, 2.2, 0]) cube([2.5, 5.6, 5.5]);
+            // Main solid bracket block
+            cube([sw_w, sw_len, back_h - floor_t - lip_h]);
+
+            // 1. Switch body pocket (6.8 x 6.8 mm, open at top)
+            // Sits switch body (6.0 x 6.0 mm) on corner ledges at Z = 1.4 mm
+            translate([1.2, (sw_len - 6.8) / 2, 1.4])
+                cube([6.8, 6.8, back_h]);
+
+            // 2. Wide leg & solder prong relief well (CRITICAL FOR ANGLED PRONGS!)
+            // Expands to 10.4 mm width along Y and cuts 2.6 mm below body ledges
+            translate([0.8, (sw_len - 10.4) / 2, -1.2])
+                cube([7.2, 10.4, back_h]);
+
+            // 3. Front window facing the button cap (+X direction)
+            // Allows button cap's pusher nub to contact switch plunger
+            translate([sw_w - 1.2, (sw_len - 5.0) / 2, 0.8])
+                cube([2.0, 5.0, back_h]);
+
+            // 4. Wire exit tunnel (-X direction into main cavity)
+            // Wires route cleanly toward XIAO and battery
+            translate([-0.5, (sw_len - 4.6) / 2, 0.0])
+                cube([2.5, 4.6, back_h]);
         }
     }
 
@@ -317,35 +361,80 @@ module back_cover_geom() {
 
 // --------------------------------------------------------------------
 // 5. PART 3: Wide U-Ring Architectural Easel Kickstand
+//    - True Concentric Barrel Knuckle around the pivot axis (R = 1.5mm)
+//      on the inside face so it rotates freely with ZERO cam binding!
+//    - Angled 58-degree flat stop face above the barrel that engages
+//      the pocket floor only after swinging open a full ~58 degrees!
+//    - Flat-bottomed D-profile pivot pins with conical root fillets
 // --------------------------------------------------------------------
+module d_pin(d, len, root_fillet=1.0) {
+    intersection() {
+        union() {
+            rotate([0, 90, 0])
+                cylinder(d1=d, d2=d - 0.5, h=len);
+            rotate([0, 90, 0])
+                cylinder(d1=d + root_fillet * 2, d2=d, h=root_fillet);
+        }
+        translate([0, -d, -d / 2])
+            cube([len + 1, d * 2, d]);
+    }
+}
+
 module kickstand() {
+    pin_local_y = ks_h - 3.6; // Pivot center is 3.6mm from top of leg
     difference() {
         union() {
             difference() {
+                // Full-thickness U-frame
                 rounded_box(ks_w, ks_h, ks_thick, ks_corner);
 
                 // Inner U-window
                 translate([ks_leg_w, ks_leg_w, -0.1])
-                    rounded_box(ks_w - ks_leg_w * 2, ks_h, ks_thick + 0.2, 2.5);
+                    rounded_box(ks_w - ks_leg_w * 2, ks_h + 2, ks_thick + 0.2, 2.5);
 
-                // 42-degree chamfer along top ends of legs for 60-degree hard stop
-                translate([-1, ks_h - 3.2, -0.1])
-                    rotate([42, 0, 0])
-                        cube([ks_w + 2, 6, 6]);
+                // 1. Carve the top-inner quadrant above the pivot axis (`Y >= pin_local_y`, `Z >= ks_thick/2`)
+                //    and replace it with a concentric cylinder + 58-degree stop bevel so the corner
+                //     NEVER binds against the pocket floor when swinging from 0 to 58 degrees!
+                translate([-1, pin_local_y, ks_thick / 2])
+                    cube([ks_w + 2, 10, ks_thick]);
             }
 
-            // Left & Right Hinge Pivot Pins
-            translate([0, ks_h - 5.0, ks_thick / 2])
-                rotate([0, -90, 0])
-                    cylinder(d1=ks_pin_d, d2=ks_pin_d - 0.8, h=ks_pin_len);
+            // Add back the rounded barrel + 58-degree hard-stop wedge on the top of both legs
+            for (lx = [0, ks_w - ks_leg_w]) {
+                intersection() {
+                    translate([lx, 0, 0])
+                        rounded_box(ks_leg_w, ks_h, ks_thick, ks_corner);
+                    union() {
+                        // Concentric cylinder around pivot axis (R = ks_thick/2 = 1.5mm)
+                        // Rotates at constant radius 1.5mm -> zero binding against pocket floor!
+                        translate([lx, pin_local_y, ks_thick / 2])
+                            rotate([0, 90, 0])
+                                cylinder(r=ks_thick / 2, h=ks_leg_w);
+                        // Exterior flush half of the knuckle (`Z = 0 .. ks_thick/2`) with 58-deg stop bevel
+                        difference() {
+                            translate([lx, pin_local_y, 0])
+                                cube([ks_leg_w, 4.0, ks_thick]);
+                            // Bevel starting at the top tangent of the barrel so it rotates 58 deg
+                            // before hitting the pocket floor (leaves a thick 1.5mm blunt tip!)
+                            translate([lx - 0.5, pin_local_y, ks_thick / 2])
+                                rotate([-32, 0, 0])
+                                    cube([ks_leg_w + 1, 6.0, 5.0]);
+                        }
+                    }
+                }
+            }
 
-            translate([ks_w, ks_h - 5.0, ks_thick / 2])
-                rotate([0, 90, 0])
-                    cylinder(d1=ks_pin_d, d2=ks_pin_d - 0.8, h=ks_pin_len);
+            // Left & Right Flat-Bottomed Root-Filleted Pivot Pins (at Y = pin_local_y)
+            translate([0.2, pin_local_y, ks_thick / 2])
+                mirror([1, 0, 0])
+                    d_pin(ks_pin_d, ks_pin_len + 0.2, root_fillet=1.0);
 
-            // Closed-Position Retention Nubs
-            translate([0, 9.0, ks_thick / 2]) sphere(r=0.75);
-            translate([ks_w, 9.0, ks_thick / 2]) sphere(r=0.75);
+            translate([ks_w - 0.2, pin_local_y, ks_thick / 2])
+                d_pin(ks_pin_d, ks_pin_len + 0.2, root_fillet=1.0);
+
+            // Closed-Position Retention Nubs (overlapped into legs)
+            translate([0.15, 9.0, ks_thick / 2]) sphere(r=0.70);
+            translate([ks_w - 0.15, 9.0, ks_thick / 2]) sphere(r=0.70);
         }
 
         // Thumb lip groove on bottom crossbar
@@ -359,9 +448,16 @@ module kickstand() {
 // --------------------------------------------------------------------
 module button_cap() {
     union() {
+        // Retention flange (slides vertically in 11.6 x 2.6mm track)
         rounded_box(1.4, 10.6, 5.4, 0.6);
+
+        // Actuator pill head (protrudes 1.6mm outside frame wall)
         translate([1.4, 1.4, 0.8])
             rounded_box(3.8, 7.8, 3.8, 1.4);
+
+        // Cylindrical pusher nub (contacts the center of the tactile switch plunger)
+        translate([-1.0, (10.6 - 3.4) / 2, (5.4 - 3.4) / 2])
+            rounded_box(1.0, 3.4, 3.4, 0.8);
     }
 }
 
@@ -397,7 +493,7 @@ if (part == "assembled") {
         translate([ks_x, ks_y, 0])
             kickstand();
     color("#d4a04a")
-        translate([frame_w - 3.2 - 1.4, 16.8, floor_t + 0.2])
+        translate([frame_w - 3.8, btn_y - 10.6 / 2, floor_t + 1.2])
             button_cap();
     color("#f2ece1")
         translate([frame_w, 0, back_h + front_h])
@@ -410,10 +506,10 @@ if (part == "assembled") {
     color("#d4a04a")
         translate([ks_x, ks_hinge_y, ks_thick / 2])
             rotate([58, 0, 0])
-                translate([0, -(ks_h - 5.0), -ks_thick / 2])
+                translate([0, -(ks_h - 3.6), -ks_thick / 2])
                     kickstand();
     color("#d4a04a")
-        translate([frame_w - 3.2 - 1.4, 16.8, floor_t + 0.2])
+        translate([frame_w - 3.8, btn_y - 10.6 / 2, floor_t + 1.2])
             button_cap();
     color("#f2ece1")
         translate([frame_w, 0, back_h + front_h])
@@ -426,7 +522,7 @@ if (part == "assembled") {
         translate([ks_x, ks_y, -20])
             kickstand();
     color("#d4a04a")
-        translate([frame_w + 10, 16.8, floor_t + 0.2])
+        translate([frame_w + 10, btn_y - 10.6 / 2, floor_t + 1.2])
             button_cap();
     if (show_electronics)
         translate([0, 0, 18]) ghost_electronics();
@@ -451,7 +547,7 @@ if (part == "assembled") {
 
 } else if (part == "button") {
     // Ready to print flat on inner flange
-    translate([0, 0, 1.4])
+    translate([1.0, 0, 0])
         rotate([0, -90, 0])
             button_cap();
 }
