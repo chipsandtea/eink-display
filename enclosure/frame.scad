@@ -252,6 +252,29 @@ module back_cover_geom() {
                     cylinder(d=ks_pin_d + 0.45, h=ks_pin_len + 0.4);
         }
 
+        // ---- Kickstand Hinge Full-Extension (58 deg) and Stowed (0 deg) Detents ----
+        // Creates a crisp, positive click at full extension (~58 deg) backed by the 58 deg hard-stop.
+        // Uses the 44mm U-ring legs as natural cantilever spring arms (flexing inward ~0.25mm).
+        for (wx = [ks_x - ks_tol, ks_x + ks_w + ks_tol]) {
+            side_sign = (wx < frame_w / 2) ? -1 : 1;
+
+            // 1. Deployed 58-degree Locking Detent Dimple (sharp click at full extension):
+            translate([wx + side_sign * 0.20, ks_hinge_y + 1.76, ks_thick / 2 + 1.64])
+                sphere(r=0.90, $fn=24);
+
+            // 2. Stowed 0-degree Rest Dimple (relaxes spring tension when folded):
+            translate([wx + side_sign * 0.15, ks_hinge_y + 2.32, ks_thick / 2 - 0.62])
+                sphere(r=0.85, $fn=24);
+
+            // 3. Smooth Guided Arc Channel from 0 deg to 45 deg (transitions to a 0.18mm crest before the 58 deg snap):
+            hull() {
+                translate([wx + side_sign * 0.05, ks_hinge_y + 2.32, ks_thick / 2 - 0.62])
+                    sphere(r=0.65, $fn=20);
+                translate([wx + side_sign * 0.05, ks_hinge_y + 2.08, ks_thick / 2 + 1.20])
+                    sphere(r=0.65, $fn=20);
+            }
+        }
+
         // Closed-Position Retention Detent Recesses near bottom of kickstand pocket
         for (dx = [ks_x - 0.3, ks_x + ks_w + 0.3]) {
             translate([dx, ks_y + 9.0, ks_thick / 2])
@@ -410,15 +433,16 @@ module kickstand() {
                         translate([lx, pin_local_y, ks_thick / 2])
                             rotate([0, 90, 0])
                                 cylinder(r=ks_thick / 2, h=ks_leg_w);
-                        // Exterior flush half of the knuckle (`Z = 0 .. ks_thick/2`) with 58-deg stop bevel
+                        // Knuckle block with exact 58-degree planar hard-stop face:
+                        // When kickstand reaches 58 degrees, this face becomes 100% horizontal
+                        // and rests squarely flush against the 3.65mm pocket floor!
                         difference() {
                             translate([lx, pin_local_y, 0])
                                 cube([ks_leg_w, 4.0, ks_thick]);
-                            // Bevel starting at the top tangent of the barrel so it rotates 58 deg
-                            // before hitting the pocket floor (leaves a thick 1.5mm blunt tip!)
                             translate([lx - 0.5, pin_local_y, ks_thick / 2])
-                                rotate([-32, 0, 0])
-                                    cube([ks_leg_w + 1, 6.0, 5.0]);
+                                rotate([-58, 0, 0])
+                                    translate([0, -2.0, 2.15])
+                                        cube([ks_leg_w + 1, 12.0, 6.0]);
                         }
                     }
                 }
@@ -432,9 +456,16 @@ module kickstand() {
             translate([ks_w - 0.2, pin_local_y, ks_thick / 2])
                 d_pin(ks_pin_d, ks_pin_len + 0.2, root_fillet=1.0);
 
+            // Knuckle Detent Nubs for Full-Extension Click (at radius = 2.4mm, angle = -15 deg relative to pivot)
+            // Symmetrically flexes the 44mm U-frame legs inward by ~0.25mm before snapping into the 58 deg dimples!
+            translate([0.15, pin_local_y + 2.32, ks_thick / 2 - 0.62])
+                sphere(r=0.75, $fn=24);
+            translate([ks_w - 0.15, pin_local_y + 2.32, ks_thick / 2 - 0.62])
+                sphere(r=0.75, $fn=24);
+
             // Closed-Position Retention Nubs (overlapped into legs)
-            translate([0.15, 9.0, ks_thick / 2]) sphere(r=0.70);
-            translate([ks_w - 0.15, 9.0, ks_thick / 2]) sphere(r=0.70);
+            translate([0.15, 9.0, ks_thick / 2]) sphere(r=0.70, $fn=24);
+            translate([ks_w - 0.15, 9.0, ks_thick / 2]) sphere(r=0.70, $fn=24);
         }
 
         // Thumb lip groove on bottom crossbar
